@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskMaster - To-Do List App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      .task-item:hover .task-actions {
+        opacity: 1;
+      }
+
+      .task-actions {
+        transition: opacity 0.2s ease;
+      }
+
+      .completed {
+        text-decoration: line-through;
+        color: #9ca3af;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .task-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+
+      .completed-date {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-left: 0.5rem;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+      <!-- Header -->
+      <header class="mb-8 text-center">
+        <h1 class="text-4xl font-bold mb-2" style="color: #f0907c">
+          TaskMaster
+        </h1>
+        <p class="text-gray-600">Organiza tu día, una tarea a la vez</p>
+      </header>
+
+      <!-- Agregar formulario de tarea -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <form id="task-form" class="flex gap-2">
+          <input
+            type="text"
+            id="task-input"
+            placeholder="¿Qué necesitas hacer hoy?"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300"
+            required
+          />
+          <button
+            type="submit"
+            class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-300 transition-colors flex items-center gap-2"
+          >
+            <i class="fas fa-plus"></i> Agregar
+          </button>
+        </form>
+      </div>
+
+      <!-- Filtros de tareas -->
+      <div class="flex justify-center mb-6">
+        <div class="bg-white rounded-lg shadow-sm p-1 inline-flex">
+          <button
+            id="filter-all"
+            class="px-4 py-2 rounded-md font-medium text-orange-600 bg-orange-50"
+          >
+            Todas
+          </button>
+          <button
+            id="filter-active"
+            class="px-4 py-2 rounded-md font-medium text-gray-600 hover:text-orange-600"
+          >
+            Pendientes
+          </button>
+          <button
+            id="filter-completed"
+            class="px-4 py-2 rounded-md font-medium text-gray-600 hover:text-orange-600"
+          >
+            Completadas
+          </button>
+        </div>
+      </div>
+
+      <!-- Estadísticas de tareas -->
+      <div class="flex justify-between items-center mb-4 px-2">
+        <p id="task-count" class="text-sm text-gray-600">0 tareas pendientes</p>
+        <button
+          id="clear-completed"
+          class="text-sm text-gray-600 hover:text-orange-600"
+        >
+          Limpiar completadas
+        </button>
+      </div>
+
+      <!-- Lista de las tareas -->
+      <div id="task-list" class="bg-white rounded-lg shadow-md overflow-hidden">
+        <!-- Las tareas serán añadidas dinamicamente -->
+        <div id="empty-state" class="p-8 text-center">
+          <i class="fas fa-clipboard-list text-4xl text-gray-300 mb-4"></i>
+          <h3 class="text-lg font-medium text-gray-700">No hay tareas</h3>
+          <p class="text-gray-500">Agrega una tarea para comenzar</p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="mt-8 text-center text-sm text-gray-500">
+        <p>Arrastra tareas para reordenarlas.</p>
+        <p class="mt-2">© 2025 Soletion - ¡Organiza tu vida!</p>
+      </footer>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Elementos del DOM
+        const taskForm = document.getElementById("task-form");
+        const taskInput = document.getElementById("task-input");
+        const taskList = document.getElementById("task-list");
+        const emptyState = document.getElementById("empty-state");
+        const taskCount = document.getElementById("task-count");
+        const clearCompleted = document.getElementById("clear-completed");
+        const filterAll = document.getElementById("filter-all");
+        const filterActive = document.getElementById("filter-active");
+        const filterCompleted = document.getElementById("filter-completed");
+
+        let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+        let currentFilter = "all";
+
+        // Iniciar la aplicación
+        renderTasks();
+        updateTaskCount();
+
+        // Eventos 
+        taskForm.addEventListener("submit", addTask);
+        clearCompleted.addEventListener("click", clearCompletedTasks);
+        filterAll.addEventListener("click", () => setFilter("all"));
+        filterActive.addEventListener("click", () => setFilter("active"));
+        filterCompleted.addEventListener("click", () => setFilter("completed"));
+
+        // Funciones
+        function addTask(e) {
+          e.preventDefault();
+
+          const taskText = taskInput.value.trim();
+          if (taskText === "") return;
+
+          const newTask = {
+            id: Date.now(),
+            text: taskText,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            completedAt: null,
+          };
+
+          tasks.unshift(newTask);
+          saveTasks();
+          renderTasks();
+          updateTaskCount();
+
+          taskInput.value = "";
+          taskInput.focus();
+        }
+
+        function renderTasks() {
+          // Filter tasks based on current filter
+          let filteredTasks = tasks;
+          if (currentFilter === "active") {
+            filteredTasks = tasks.filter((task) => !task.completed);
+          } else if (currentFilter === "completed") {
+            filteredTasks = tasks.filter((task) => task.completed);
+          }
+
+          if (filteredTasks.length === 0) {
+            emptyState.style.display = "block";
+            taskList.innerHTML = "";
+            taskList.appendChild(emptyState);
+            return;
+          }
+
+          emptyState.style.display = "none";
+
+          // Crear elementos de tarea
+          taskList.innerHTML = "";
+          filteredTasks.forEach((task) => {
+            const taskElement = createTaskElement(task);
+            taskList.appendChild(taskElement);
+          });
+        }
+
+        function createTaskElement(task) {
+          const taskElement = document.createElement("div");
+          taskElement.className =
+            "task-item border-b border-gray-100 last:border-0 group hover:bg-gray-50 transition-colors";
+          taskElement.dataset.id = task.id;
+
+          // Formatear fecha de completado si existe
+          let completedDateHtml = "";
+          if (task.completed && task.completedAt) {
+            const completedDate = new Date(task.completedAt);
+            const day = String(completedDate.getDate()).padStart(2, "0");
+            const month = String(completedDate.getMonth() + 1).padStart(2, "0");
+            const year = completedDate.getFullYear();
+            completedDateHtml = `<span class="completed-date">(${day}/${month}/${year})</span>`;
+          }
+
+          taskElement.innerHTML = `
+                    <div class="p-4 flex items-center justify-between">
+                        <div class="flex items-center">
+                            <button class="complete-btn mr-3 w-6 h-6 rounded-full border-2 ${
+                              task.completed
+                                ? "border-orange-300 bg-orange-300 text-white"
+                                : "border-gray-300"
+                            } flex items-center justify-center">
+                                ${
+                                  task.completed
+                                    ? '<i class="fas fa-check text-xs"></i>'
+                                    : ""
+                                }
+                            </button>
+                            <div class="flex flex-col">
+                                <span class="task-text ${
+                                  task.completed ? "completed" : ""
+                                }">${task.text}</span>
+                                ${task.completed ? completedDateHtml : ""}
+                            </div>
+                        </div>
+                        <div class="task-actions opacity-0 group-hover:opacity-100 flex gap-2">
+                            <button class="edit-btn p-1 text-gray-400 hover:text-orange-300">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button class="delete-btn p-1 text-gray-400 hover:text-red-500">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+          // Agregar animación de aparición gradual para nuevas tareas
+          if (!document.querySelector(`[data-id="${task.id}"]`)) {
+            taskElement.classList.add("task-fade-in");
+          }
+
+          // Agregar eventos a los botones
+          const completeBtn = taskElement.querySelector(".complete-btn");
+          const deleteBtn = taskElement.querySelector(".delete-btn");
+          const editBtn = taskElement.querySelector(".edit-btn");
+          const taskText = taskElement.querySelector(".task-text");
+
+          completeBtn.addEventListener("click", () => toggleComplete(task.id));
+          deleteBtn.addEventListener("click", () => deleteTask(task.id));
+          editBtn.addEventListener("click", () => editTask(task.id, taskText));
+
+          return taskElement;
+        }
+
+        function toggleComplete(taskId) {
+          tasks = tasks.map((task) => {
+            if (task.id === taskId) {
+              const isNowCompleted = !task.completed;
+              return {
+                ...task,
+                completed: isNowCompleted,
+                completedAt: isNowCompleted ? new Date().toISOString() : null,
+              };
+            }
+            return task;
+          });
+
+          saveTasks();
+          renderTasks();
+          updateTaskCount();
+        }
+
+        function deleteTask(taskId) {
+          tasks = tasks.filter((task) => task.id !== taskId);
+          saveTasks();
+          renderTasks();
+          updateTaskCount();
+        }
+
+        function editTask(taskId, taskTextElement) {
+          const task = tasks.find((t) => t.id === taskId);
+          if (!task) return;
+
+          const currentText = task.text;
+          const input = document.createElement("input");
+          input.type = "text";
+          input.value = currentText;
+          input.className = "px-2 py-1 border border-gray-300 rounded";
+
+          // Reemplazamos el elemento padre que contiene tanto el texto como la fecha
+          const parentElement = taskTextElement.parentElement;
+          parentElement.replaceWith(input);
+          input.focus();
+
+          function saveEdit() {
+            const newText = input.value.trim();
+            if (newText && newText !== currentText) {
+              tasks = tasks.map((t) =>
+                t.id === taskId ? { ...t, text: newText } : t
+              );
+              saveTasks();
+            }
+
+            renderTasks();
+          }
+
+          input.addEventListener("blur", saveEdit);
+          input.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+              saveEdit();
+            }
+          });
+        }
+
+        function clearCompletedTasks() {
+          tasks = tasks.filter((task) => !task.completed);
+          saveTasks();
+          renderTasks();
+          updateTaskCount();
+        }
+
+        function setFilter(filter) {
+          currentFilter = filter;
+
+          // Boton de actualizar filtro activo
+          [filterAll, filterActive, filterCompleted].forEach((btn) => {
+            btn.classList.remove("text-orange-600", "bg-orange-50");
+            btn.classList.add("text-gray-600", "hover:text-orange-600");
+          });
+
+          const activeBtn =
+            filter === "all"
+              ? filterAll
+              : filter === "active"
+              ? filterActive
+              : filterCompleted;
+
+          activeBtn.classList.add("text-orange-600", "bg-orange-50");
+          activeBtn.classList.remove("hover:text-orange-600");
+
+          renderTasks();
+        }
+
+        function updateTaskCount() {
+          const activeTasks = tasks.filter((task) => !task.completed).length;
+          taskCount.textContent = `${activeTasks} ${
+            activeTasks === 1 ? "tarea pendiente" : "tareas pendientes"
+          }`;
+        }
+
+        function saveTasks() {
+          localStorage.setItem("tasks", JSON.stringify(tasks));
+        }
+
+        // Funcionalidad de arrastrar y soltar
+        let draggedItem = null;
+
+        taskList.addEventListener("dragstart", function (e) {
+          if (e.target.classList.contains("task-item")) {
+            draggedItem = e.target;
+            setTimeout(() => {
+              e.target.style.opacity = "0.4";
+            }, 0);
+          }
+        });
+
+        taskList.addEventListener("dragend", function (e) {
+          if (e.target.classList.contains("task-item")) {
+            e.target.style.opacity = "1";
+          }
+        });
+
+        taskList.addEventListener("dragover", function (e) {
+          e.preventDefault();
+          const afterElement = getDragAfterElement(taskList, e.clientY);
+          const currentItem = document.querySelector(".dragging");
+
+          if (!currentItem) {
+            const taskItem = e.target.closest(".task-item");
+            if (taskItem) {
+              draggedItem = taskItem;
+            }
+          }
+
+          if (afterElement == null) {
+            taskList.appendChild(draggedItem);
+          } else {
+            taskList.insertBefore(draggedItem, afterElement);
+          }
+        });
+
+        function getDragAfterElement(container, y) {
+          const draggableElements = [
+            ...container.querySelectorAll(".task-item:not(.dragging)"),
+          ];
+
+          return draggableElements.reduce(
+            (closest, child) => {
+              const box = child.getBoundingClientRect();
+              const offset = y - box.top - box.height / 2;
+
+              if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+              } else {
+                return closest;
+              }
+            },
+            { offset: Number.NEGATIVE_INFINITY }
+          ).element;
+        }
+      });
+    </script>
+  </body>
+</html>

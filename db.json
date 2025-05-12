@@ -1,0 +1,6 @@
+{
+  "tasks": [
+    { "id": 1, "text": "Aprender JavaScript", "completed": false },
+    { "id": 2, "text": "Hacer la compra", "completed": true }
+  ]
+}
